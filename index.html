@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instagram-Style Night Chat</title>
+  <style>
+      * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+          font-family: Arial, sans-serif;
+      }
+
+      body {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+          background-color: #121212;
+      }
+
+      .chat-container {
+          width: 100%;
+          max-width: 400px;
+          height: 90vh; /* Set a height for the chat container */
+          background: #1c1c1c;
+          border-radius: 20px;
+          overflow: hidden;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+          display: flex;
+          flex-direction: column;
+      }
+
+      .chat-header {
+          background-color: #242424;
+          padding: 15px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-bottom: 1px solid #3e3e3e;
+          font-weight: bold;
+          font-size: 1.2rem;
+          color: #e1e1e1;
+      }
+
+      .chat-messages {
+          flex: 1;
+          padding: 15px;
+          background-color: #1a1a1a;
+          overflow-y: auto; /* Scrollable area */
+          display: flex;
+          flex-direction: column; /* New messages at the bottom */
+      }
+
+      .message {
+          margin: 10px 0;
+          padding: 10px 15px;
+          max-width: 70%;
+          border-radius: 20px;
+          word-wrap: break-word;
+          position: relative;
+          font-size: 0.9rem;
+      }
+
+      .message.sent {
+          background-color: #405de6;
+          color: #fff;
+          align-self: flex-end;
+      }
+
+      .message.received {
+          background-color: #3e3e3e;
+          color: #d1d1d1;
+          align-self: flex-start;
+      }
+
+      .username {
+          font-weight: bold;
+          color: #9a9a9a;
+          font-size: 0.8rem;
+          margin-bottom: 5px;
+      }
+
+      .typing-indicator {
+          font-size: 0.85rem;
+          color: #ff6a6a;
+          margin: 5px 0;
+      }
+
+      .chat-footer {
+          display: flex;
+          padding: 15px;
+          background: #242424;
+          border-top: 1px solid #3e3e3e;
+          align-items: center;
+      }
+
+      .chat-footer input[type="text"] {
+          flex: 1;
+          padding: 10px 15px;
+          font-size: 1rem;
+          border: 1px solid #3e3e3e;
+          border-radius: 20px;
+          outline: none;
+          background-color: #333;
+          color: #e1e1e1;
+      }
+
+      .chat-footer button {
+          margin-left: 10px;
+          padding: 10px 15px;
+          font-size: 1rem;
+          background-color: #fd1d1d;
+          color: #fff;
+          border: none;
+          border-radius: 20px;
+          cursor: pointer;
+          transition: background-color 0.3s;
+      }
+
+      .chat-footer button:hover {
+          background-color: #ff6a6a;
+      }
+
+      .username-input {
+          margin: 20px 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+      }
+
+      .username-input input {
+          padding: 10px;
+          font-size: 1rem;
+          border: 1px solid #3e3e3e;
+          border-radius: 5px;
+          margin-right: 10px;
+          width: 70%;
+          background-color: #333;
+          color: #e1e1e1;
+      }
+  </style>
+</head>
+<body>
+<div class="chat-container">
+  <div class="chat-header">Chat</div>
+  <div id="usernameContainer" class="username-input">
+    <input type="text" id="usernameInput" placeholder="Enter your name" />
+    <button onclick="setUsername()">Join</button>
+  </div>
+  <div class="chat-messages" id="messages">
+    <div id="typingIndicator" class="typing-indicator" style="display: none;">Someone is typing...</div>
+  </div>
+  <div class="chat-footer">
+    <input type="text" id="messageInput" placeholder="Type a message..." onkeydown="handleTyping(event)" />
+    <button onclick="sendMessage()">Send</button>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+<script>
+  let username = "";
+  let typingTimeout;
+  const socket = io("http://localhost:3002");
+
+  socket.on("connect", () => {
+    console.log("Connected to the server");
+  });
+
+  socket.on("user-joined", (data) => {
+    addMessage(data.message, "received");
+  });
+
+  socket.on("user-left", (data) => {
+    addMessage(data.message, "received");
+  });
+
+  socket.on("message", (message) => {
+    addMessage(`${message.username}: ${message.text}`, "received");
+  });
+
+  socket.on("user-typing", (data) => {
+    if (data.username !== username) {
+      const typingIndicator = document.getElementById("typingIndicator");
+      typingIndicator.style.display = "block";
+      typingIndicator.textContent = `${data.username} is typing...`;
+    }
+  });
+
+  socket.on("stop-typing", () => {
+    document.getElementById("typingIndicator").style.display = "none";
+  });
+
+  function setUsername() {
+    const input = document.getElementById("usernameInput");
+    username = input.value.trim();
+    if (username) {
+      document.getElementById("usernameContainer").style.display = "none";
+      addMessage(`You joined the chat as ${username}`, "sent");
+    }
+  }
+
+  function sendMessage() {
+    const input = document.getElementById("messageInput");
+    const message = input.value.trim();
+    if (message && username) {
+      socket.emit("newMessage", { username, text: message });
+      addMessage(`You: ${message}`, "sent");
+      input.value = "";
+      socket.emit("stop-typing", { username });
+    }
+  }
+
+  function handleTyping(event) {
+    if (event.key === "Enter") {
+      sendMessage();
+    } else {
+      socket.emit("user-typing", { username });
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => socket.emit("stop-typing"), 1000);
+    }
+  }
+
+  function addMessage(text, type = "received") {
+    const messagesDiv = document.getElementById("messages");
+    const messageDiv = document.createElement("div");
+    messageDiv.classList.add("message", type);
+    if (type === "received" && text.includes(":")) {
+      const [sender, ...msg] = text.split(":");
+      const usernameSpan = document.createElement("div");
+      usernameSpan.classList.add("username");
+      usernameSpan.textContent = sender;
+      messageDiv.appendChild(usernameSpan);
+      messageDiv.appendChild(document.createTextNode(msg.join(":").trim()));
+    } else {
+      messageDiv.innerText = text;
+    }
+    messagesDiv.appendChild(messageDiv); // Add message to the bottom of the chat
+    messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to the bottom
+  }
+</script>
+</body>
+</html>
