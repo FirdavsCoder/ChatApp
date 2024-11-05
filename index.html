@@ -23,7 +23,6 @@
       .chat-container {
           width: 100%;
           max-width: 400px;
-          height: 90vh; /* Set a height for the chat container */
           background: #1c1c1c;
           border-radius: 20px;
           overflow: hidden;
@@ -48,9 +47,9 @@
           flex: 1;
           padding: 15px;
           background-color: #1a1a1a;
-          overflow-y: auto; /* Scrollable area */
+          overflow-y: auto;
           display: flex;
-          flex-direction: column; /* New messages at the bottom */
+          flex-direction: column;
       }
 
       .message {
@@ -86,6 +85,27 @@
           font-size: 0.85rem;
           color: #ff6a6a;
           margin: 5px 0;
+          display: flex;
+          align-items: center;
+      }
+
+      .typing-indicator::before {
+          content: '';
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #ff6a6a;
+          animation: typing 1.5s infinite ease-in-out;
+          margin-right: 5px;
+      }
+
+      @keyframes typing {
+          0%, 100% {
+              transform: scale(1);
+          }
+          50% {
+              transform: scale(1.5);
+          }
       }
 
       .chat-footer {
@@ -140,6 +160,13 @@
           background-color: #333;
           color: #e1e1e1;
       }
+
+      .current-typing {
+          font-size: 0.85rem;
+          color: #e1e1e1;
+          margin: 5px 0;
+          display: none;
+      }
   </style>
 </head>
 <body>
@@ -151,6 +178,7 @@
   </div>
   <div class="chat-messages" id="messages">
     <div id="typingIndicator" class="typing-indicator" style="display: none;">Someone is typing...</div>
+    <div id="currentTyping" class="current-typing"></div>
   </div>
   <div class="chat-footer">
     <input type="text" id="messageInput" placeholder="Type a message..." onkeydown="handleTyping(event)" />
@@ -178,18 +206,22 @@
 
   socket.on("message", (message) => {
     addMessage(`${message.username}: ${message.text}`, "received");
+    document.getElementById("currentTyping").style.display = "none"; // Yozishni to'xtatish
   });
 
   socket.on("user-typing", (data) => {
     if (data.username !== username) {
       const typingIndicator = document.getElementById("typingIndicator");
-      typingIndicator.style.display = "block";
+      typingIndicator.style.display = "flex";
       typingIndicator.textContent = `${data.username} is typing...`;
+      document.getElementById("currentTyping").textContent = data.text; // Yozilayotgan matn
+      document.getElementById("currentTyping").style.display = "block"; // Yozilayotgan matnni ko'rsatish
     }
   });
 
   socket.on("stop-typing", () => {
     document.getElementById("typingIndicator").style.display = "none";
+    document.getElementById("currentTyping").style.display = "none"; // Yozilayotgan matnni yashirish
   });
 
   function setUsername() {
@@ -213,10 +245,11 @@
   }
 
   function handleTyping(event) {
+    const input = document.getElementById("messageInput");
     if (event.key === "Enter") {
       sendMessage();
     } else {
-      socket.emit("user-typing", { username });
+      socket.emit("user-typing", { username, text: input.value });
       clearTimeout(typingTimeout);
       typingTimeout = setTimeout(() => socket.emit("stop-typing"), 1000);
     }
@@ -236,8 +269,8 @@
     } else {
       messageDiv.innerText = text;
     }
-    messagesDiv.appendChild(messageDiv); // Add message to the bottom of the chat
-    messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to the bottom
+    messagesDiv.appendChild(messageDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight; // So'ngi xabarni ko'rsatish
   }
 </script>
 </body>
